@@ -92,7 +92,7 @@ The system SHALL allow regenerating an API key via `POST /api/api-keys/{id}/rege
 
 ### Requirement: API Key authentication global switch
 
-The system SHALL provide an `api_key_auth_enabled` boolean in `DashboardSettings`. When false (default), local requests to protected proxy routes MAY proceed without an API key, but non-local proxy requests MUST be rejected until proxy authentication is configured. When true, protected proxy routes require a valid API key via `Authorization: Bearer <key>`.
+The system SHALL provide an `api_key_auth_enabled` boolean in `DashboardSettings`. When false (default), local requests to protected proxy routes MAY proceed without an API key. Operators MAY additionally opt specific non-local proxy clients into unauthenticated access by configuring `proxy_unauthenticated_client_cidrs`. Requests that are neither local nor explicitly allowlisted MUST be rejected until proxy authentication is configured. When true, protected proxy routes require a valid API key via `Authorization: Bearer <key>`.
 
 #### Scenario: Enable API key auth
 
@@ -110,6 +110,12 @@ The system SHALL provide an `api_key_auth_enabled` boolean in `DashboardSettings
 - **WHEN** admin submits `PUT /api/settings` with `{ "apiKeyAuthEnabled": false }`
 - **AND** a non-local client calls a protected proxy route
 - **THEN** the request is rejected with 401 until proxy authentication is configured
+
+#### Scenario: Disable API key auth for an explicitly allowlisted proxy client
+
+- **WHEN** admin submits `PUT /api/settings` with `{ "apiKeyAuthEnabled": false }`
+- **AND** the request socket peer IP belongs to configured `proxy_unauthenticated_client_cidrs`
+- **THEN** the protected proxy route proceeds without API key authentication
 
 #### Scenario: Enable without any keys created
 
@@ -151,7 +157,16 @@ The dependency SHALL raise a domain exception on validation failure. The excepti
 
 - **WHEN** `api_key_auth_enabled` is false
 - **AND** the request is classified as non-local
+- **AND** the request socket peer IP is outside configured `proxy_unauthenticated_client_cidrs`
 - **THEN** the dependency rejects the request with 401
+
+#### Scenario: Disabled auth allowlist uses raw socket peer only
+
+- **WHEN** `api_key_auth_enabled` is false
+- **AND** forwarded headers claim a different client IP
+- **AND** the request socket peer IP is outside configured `proxy_unauthenticated_client_cidrs`
+- **THEN** the dependency rejects the request with 401
+- **AND** forwarded headers do not satisfy the explicit allowlist
 
 ### Requirement: Model restriction enforcement
 
